@@ -1,0 +1,21 @@
+target/
+!.mvn/wrapper/maven-wrapper.properties
+
+# Entorno local
+.env
+
+# IDEs
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+*.log
+
+# SO
+.DS_Store
+Thumbs.db
+
+# Claude Code (config local)
+.claude/

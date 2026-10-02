@@ -1,0 +1,20 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/coworking
+    username: coworking
+    password: coworking
+  jpa:
+    show-sql: false
+
+# solo para desarrollo local: credenciales y secret de demo.
+app:
+  jwt:
+    secret: dev-only-secret-change-me-0123456789abcdef
+  bootstrap-admin:
+    email: admin@coworking.local
+    password: Admin1234!
+    full-name: Administrador Demo
+
+logging:
+  level:
+    com.coworking.reservations: DEBUG

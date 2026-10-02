@@ -1,0 +1,30 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: coworking-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-coworking}
+      POSTGRES_USER: ${POSTGRES_USER:-coworking}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-coworking}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Mock del servicio externo de pago (stubs deterministas en ./wiremock/mappings).
+  wiremock:
+    image: wiremock/wiremock:3.13.2
+    container_name: coworking-wiremock
+    command: ["--global-response-templating", "--verbose"]
+    ports:
+      - "8089:8080"
+    volumes:
+      - ./wiremock/mappings:/home/wiremock/mappings:ro
+
+volumes:
+  postgres_data:
