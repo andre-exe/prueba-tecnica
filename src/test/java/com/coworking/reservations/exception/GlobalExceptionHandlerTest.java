@@ -55,7 +55,8 @@ class GlobalExceptionHandlerTest {
             "access-denied, 403, ACCESS_DENIED",
             "optimistic-lock, 409, CONCURRENT_UPDATE",
             "exclusion, 409, RESERVATION_OVERLAP",
-            "unique, 409, DUPLICATE_RESOURCE"
+            "unique, 409, DUPLICATE_RESOURCE",
+            "no-resource, 404, NOT_FOUND"
     })
     void mapsExceptionsToProblemDetail(String path, int expectedStatus, String expectedCode) throws Exception {
         mockMvc.perform(get("/fail/" + path))
@@ -100,7 +101,7 @@ class GlobalExceptionHandlerTest {
     static class FakeController {
 
         @GetMapping("/fail/{kind}")
-        void fail(@PathVariable String kind) {
+        void fail(@PathVariable String kind) throws Exception {
             switch (kind) {
                 case "not-found" -> throw new ResourceNotFoundException("no existe");
                 case "invalid-request" -> throw new InvalidReservationRequestException("fechas invalidas");
@@ -113,6 +114,7 @@ class GlobalExceptionHandlerTest {
                 case "access-denied" -> throw new AccessDeniedException("x");
                 case "optimistic-lock" -> throw new OptimisticLockingFailureException("x");
                 case "exclusion" -> throw new DataIntegrityViolationException("x", new SQLException("x", "23P01"));
+                case "no-resource" -> throw new org.springframework.web.servlet.resource.NoResourceFoundException(org.springframework.http.HttpMethod.GET, "nada");
                 case "unique" -> throw new DataIntegrityViolationException("x", new SQLException("x", "23505"));
                 default -> throw new IllegalStateException("secreto interno");
             }

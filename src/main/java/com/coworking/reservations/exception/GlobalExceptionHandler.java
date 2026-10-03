@@ -116,13 +116,20 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @Override
     protected ResponseEntity<Object> handleExceptionInternal(Exception ex, Object body, HttpHeaders headers,
                                                              HttpStatusCode statusCode, WebRequest request) {
-        if (body instanceof ProblemDetail problem) {
+        ResponseEntity<Object> response = super.handleExceptionInternal(ex, body, headers, statusCode, request);
+        // los errores que arma spring solos traen el body nulo hasta aqui, por eso se completa despues
+        if (response != null && response.getBody() instanceof ProblemDetail problem) {
             if (problem.getInstance() == null && request instanceof ServletWebRequest servletRequest) {
                 problem.setInstance(URI.create(servletRequest.getRequest().getRequestURI()));
             }
-            problem.setProperty("timestamp", OffsetDateTime.now(ZoneOffset.UTC));
+            if (problem.getProperties() == null || !problem.getProperties().containsKey("timestamp")) {
+                problem.setProperty("timestamp", OffsetDateTime.now(ZoneOffset.UTC));
+            }
+            if (problem.getProperties() == null || !problem.getProperties().containsKey("code")) {
+                problem.setProperty("code", HttpStatus.valueOf(statusCode.value()).name());
+            }
         }
-        return super.handleExceptionInternal(ex, body, headers, statusCode, request);
+        return response;
     }
 
     private ResponseEntity<Object> build(Exception ex, HttpStatus status, String code, String detail,
