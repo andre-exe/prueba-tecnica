@@ -23,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -80,11 +81,7 @@ public class ReservationServiceImpl implements ReservationService {
     @Override
     @Transactional(readOnly = true)
     public ReservationResponse findById(UUID id, CurrentUser requester) {
-        // si no es suya responde 404 igual que si no existiera, para no revelar que esa reserva existe
-        return reservationRepository.findWithDetailsById(id)
-                .filter(r -> requester.admin() || r.getUser().getId().equals(requester.id()))
-                .map(reservationMapper::toResponse)
-                .orElseThrow(() -> new ResourceNotFoundException("Reserva no encontrada: " + id));
+        return reservationMapper.toResponse(findVisible(id, requester));
     }
 
     @Override
@@ -95,5 +92,42 @@ public class ReservationServiceImpl implements ReservationService {
         return PageResponse.from(
                 reservationRepository.findAll(ReservationSpecifications.withFilters(effective), pageable)
                         .map(reservationMapper::toResponse));
+    }
+
+    @Override
+    @Transactional
+    public ReservationResponse cancel(UUID id, CurrentUser requester) {
+        Reservation reservation = findVisible(id, requester);
+        reservation.cancel(OffsetDateTime.now(clock));
+        return reservationMapper.toResponse(reservationRepository.saveAndFlush(reservation));
+    }
+
+    @Override
+    @Transactional
+    public ReservationResponse complete(UUID id) {
+        Reservation reservation = reservationRepository.findWithDetailsById(id)
+                .orElseThrow(() -> notFound(id));
+        reservation.complete(OffsetDateTime.now(clock));
+        return reservationMapper.toResponse(reservationRepository.saveAndFlush(reservation));
+    }
+
+    @Override
+    @Transactional
+    public int completeExpired() {
+        OffsetDateTime now = OffsetDateTime.now(clock);
+        List<Reservation> expired = reservationRepository.findAll(ReservationSpecifications.confirmedAndEndedBefore(now));
+        expired.forEach(reservation -> reservation.complete(now));
+        return expired.size();
+    }
+
+    // si no es suya responde 404 igual que si no existiera, para no revelar que esa reserva existe
+    private Reservation findVisible(UUID id, CurrentUser requester) {
+        return reservationRepository.findWithDetailsById(id)
+                .filter(r -> requester.admin() || r.getUser().getId().equals(requester.id()))
+                .orElseThrow(() -> notFound(id));
+    }
+
+    private ResourceNotFoundException notFound(UUID id) {
+        return new ResourceNotFoundException("Reserva no encontrada: " + id);
     }
 }

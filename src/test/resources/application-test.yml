@@ -1,0 +1,16 @@
+app:
+  jwt:
+    secret: test-secret-test-secret-test-secret-123456
+  bootstrap-admin:
+    email: admin@test.local
+    password: Admin1234!
+    full-name: Admin de pruebas
+  reservation:
+    completion-job-cron: "-"
+  notification:
+    simulated-delay: 0s
+
+logging:
+  level:
+    root: WARN
+    com.coworking.reservations: INFO

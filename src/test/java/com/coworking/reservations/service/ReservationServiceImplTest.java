@@ -10,6 +10,7 @@ import com.coworking.reservations.domain.enums.SpaceType;
 import com.coworking.reservations.dto.request.CreateReservationRequest;
 import com.coworking.reservations.dto.response.ReservationResponse;
 import com.coworking.reservations.exception.InvalidReservationRequestException;
+import com.coworking.reservations.exception.InvalidReservationStateException;
 import com.coworking.reservations.exception.OverlappingReservationException;
 import com.coworking.reservations.exception.ResourceNotFoundException;
 import com.coworking.reservations.mapper.ReservationMapper;
@@ -23,6 +24,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mapstruct.factory.Mappers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
@@ -31,6 +33,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -204,5 +207,97 @@ class ReservationServiceImplTest {
 
     private Reservation reservationOf(User owner) {
         return new Reservation(owner, space, NOW.plusDays(1), NOW.plusDays(1).plusHours(1), 2, BigDecimal.TEN, "tok_ok");
+    }
+
+    private Reservation reservationWithStatus(ReservationStatus status, OffsetDateTime start, OffsetDateTime end) {
+        Reservation reservation = new Reservation(user, space, start, end, 2, BigDecimal.TEN, "tok_ok");
+        ReflectionTestUtils.setField(reservation, "status", status);
+        return reservation;
+    }
+
+    @Test
+    void ownerCancelsTheirPendingReservation() {
+        UUID id = UUID.randomUUID();
+        Reservation reservation = reservationWithStatus(ReservationStatus.PENDING, NOW.plusDays(1), NOW.plusDays(1).plusHours(1));
+        when(reservationRepository.findWithDetailsById(id)).thenReturn(Optional.of(reservation));
+        when(reservationRepository.saveAndFlush(reservation)).thenReturn(reservation);
+
+        ReservationResponse response = service.cancel(id, new CurrentUser(userId, false));
+
+        assertThat(response.status()).isEqualTo(ReservationStatus.CANCELLED);
+    }
+
+    @Test
+    void adminCancelsSomeoneElsesReservation() {
+        UUID id = UUID.randomUUID();
+        Reservation reservation = reservationWithStatus(ReservationStatus.CONFIRMED, NOW.plusDays(1), NOW.plusDays(1).plusHours(1));
+        when(reservationRepository.findWithDetailsById(id)).thenReturn(Optional.of(reservation));
+        when(reservationRepository.saveAndFlush(reservation)).thenReturn(reservation);
+
+        assertThat(service.cancel(id, new CurrentUser(UUID.randomUUID(), true)).status()).isEqualTo(ReservationStatus.CANCELLED);
+    }
+
+    @Test
+    void cancellingSomeoneElsesReservationLooksLikeNotFound() {
+        UUID id = UUID.randomUUID();
+        Reservation reservation = reservationWithStatus(ReservationStatus.PENDING, NOW.plusDays(1), NOW.plusDays(1).plusHours(1));
+        when(reservationRepository.findWithDetailsById(id)).thenReturn(Optional.of(reservation));
+
+        assertThatThrownBy(() -> service.cancel(id, new CurrentUser(UUID.randomUUID(), false)))
+                .isInstanceOf(ResourceNotFoundException.class);
+        verify(reservationRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void cannotCancelAConfirmedReservationThatAlreadyStarted() {
+        UUID id = UUID.randomUUID();
+        Reservation reservation = reservationWithStatus(ReservationStatus.CONFIRMED, NOW.minusHours(1), NOW.plusHours(1));
+        when(reservationRepository.findWithDetailsById(id)).thenReturn(Optional.of(reservation));
+
+        assertThatThrownBy(() -> service.cancel(id, new CurrentUser(userId, false)))
+                .isInstanceOf(InvalidReservationStateException.class);
+    }
+
+    @Test
+    void cannotCancelTwice() {
+        UUID id = UUID.randomUUID();
+        Reservation reservation = reservationWithStatus(ReservationStatus.CANCELLED, NOW.plusDays(1), NOW.plusDays(1).plusHours(1));
+        when(reservationRepository.findWithDetailsById(id)).thenReturn(Optional.of(reservation));
+
+        assertThatThrownBy(() -> service.cancel(id, new CurrentUser(userId, false)))
+                .isInstanceOf(InvalidReservationStateException.class);
+    }
+
+    @Test
+    void completesAReservationThatAlreadyEnded() {
+        UUID id = UUID.randomUUID();
+        Reservation reservation = reservationWithStatus(ReservationStatus.CONFIRMED, NOW.minusHours(3), NOW.minusHours(2));
+        when(reservationRepository.findWithDetailsById(id)).thenReturn(Optional.of(reservation));
+        when(reservationRepository.saveAndFlush(reservation)).thenReturn(reservation);
+
+        assertThat(service.complete(id).status()).isEqualTo(ReservationStatus.COMPLETED);
+    }
+
+    @Test
+    void cannotCompleteBeforeItEnds() {
+        UUID id = UUID.randomUUID();
+        Reservation reservation = reservationWithStatus(ReservationStatus.CONFIRMED, NOW.minusHours(1), NOW.plusHours(1));
+        when(reservationRepository.findWithDetailsById(id)).thenReturn(Optional.of(reservation));
+
+        assertThatThrownBy(() -> service.complete(id)).isInstanceOf(InvalidReservationStateException.class);
+    }
+
+    @Test
+    void completeExpiredMarksEveryFinishedReservation() {
+        Reservation first = reservationWithStatus(ReservationStatus.CONFIRMED, NOW.minusHours(5), NOW.minusHours(4));
+        Reservation second = reservationWithStatus(ReservationStatus.CONFIRMED, NOW.minusHours(3), NOW.minusHours(2));
+        when(reservationRepository.findAll(org.mockito.ArgumentMatchers.<Specification<Reservation>>any()))
+                .thenReturn(List.of(first, second));
+
+        int completed = service.completeExpired();
+
+        assertThat(completed).isEqualTo(2);
+        assertThat(first.getStatus()).isEqualTo(ReservationStatus.COMPLETED);
+        assertThat(second.getStatus()).isEqualTo(ReservationStatus.COMPLETED);
     }
 }

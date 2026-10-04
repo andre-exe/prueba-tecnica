@@ -13,6 +13,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -61,5 +62,16 @@ public class ReservationController {
     @GetMapping("/{id}")
     public ReservationResponse get(@PathVariable UUID id, Authentication authentication) {
         return reservationService.findById(id, CurrentUser.from(authentication));
+    }
+
+    @PostMapping("/{id}/cancel")
+    public ReservationResponse cancel(@PathVariable UUID id, Authentication authentication) {
+        return reservationService.cancel(id, CurrentUser.from(authentication));
+    }
+
+    @PostMapping("/{id}/complete")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ReservationResponse complete(@PathVariable UUID id) {
+        return reservationService.complete(id);
     }
 }

@@ -16,4 +16,10 @@ public interface ReservationService {
     ReservationResponse findById(UUID id, CurrentUser requester);
 
     PageResponse<ReservationResponse> search(ReservationFilter filter, Pageable pageable, CurrentUser requester);
+
+    ReservationResponse cancel(UUID id, CurrentUser requester);
+
+    ReservationResponse complete(UUID id);
+
+    int completeExpired();
 }

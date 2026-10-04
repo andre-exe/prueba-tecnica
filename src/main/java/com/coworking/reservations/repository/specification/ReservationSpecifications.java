@@ -1,16 +1,24 @@
 package com.coworking.reservations.repository.specification;
 
 import com.coworking.reservations.domain.entity.Reservation;
+import com.coworking.reservations.domain.enums.ReservationStatus;
 import com.coworking.reservations.dto.request.ReservationFilter;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.jpa.domain.Specification;
 
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
 public final class ReservationSpecifications {
 
     private ReservationSpecifications() {
+    }
+
+    public static Specification<Reservation> confirmedAndEndedBefore(OffsetDateTime now) {
+        return (root, query, cb) -> cb.and(
+                cb.equal(root.get("status"), ReservationStatus.CONFIRMED),
+                cb.lessThan(root.get("endTime"), now));
     }
 
     public static Specification<Reservation> withFilters(ReservationFilter filter) {
