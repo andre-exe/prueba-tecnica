@@ -8,7 +8,20 @@ app:
   reservation:
     completion-job-cron: "-"
   notification:
-    simulated-delay: 0s
+    simulated-delay: 3s
+  payment:
+    connect-timeout: 1s
+    read-timeout: 3s
+
+# umbrales bajos para poder abrir el circuito en pocas llamadas
+resilience4j:
+  circuitbreaker:
+    instances:
+      paymentService:
+        sliding-window-size: 4
+        minimum-number-of-calls: 3
+        wait-duration-in-open-state: 3s
+        permitted-number-of-calls-in-half-open-state: 1
 
 logging:
   level:

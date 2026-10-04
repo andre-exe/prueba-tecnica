@@ -1,0 +1,21 @@
+{
+  "name": "tok_slow - responde en 5 segundos, mas que el timeout de la app",
+  "priority": 1,
+  "request": {
+    "method": "POST",
+    "urlPath": "/api/payments/validate",
+    "bodyPatterns": [
+      { "equalToJson": "{ \"paymentMethod\": \"tok_slow\" }", "ignoreExtraElements": true }
+    ]
+  },
+  "response": {
+    "status": 200,
+    "fixedDelayMilliseconds": 5000,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": {
+      "approved": true,
+      "transactionId": "txn-{{randomValue type='UUID'}}",
+      "reason": null
+    }
+  }
+}

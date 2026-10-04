@@ -3,15 +3,18 @@ package com.coworking.reservations.controller;
 import com.coworking.reservations.domain.enums.ReservationStatus;
 import com.coworking.reservations.dto.request.CreateReservationRequest;
 import com.coworking.reservations.dto.request.ReservationFilter;
+import com.coworking.reservations.dto.response.ConfirmReservationResponse;
 import com.coworking.reservations.dto.response.PageResponse;
 import com.coworking.reservations.dto.response.ReservationResponse;
 import com.coworking.reservations.security.CurrentUser;
+import com.coworking.reservations.service.ReservationConfirmationService;
 import com.coworking.reservations.service.ReservationService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -32,9 +35,12 @@ import java.util.UUID;
 public class ReservationController {
 
     private final ReservationService reservationService;
+    private final ReservationConfirmationService confirmationService;
 
-    public ReservationController(ReservationService reservationService) {
+    public ReservationController(ReservationService reservationService,
+                                 ReservationConfirmationService confirmationService) {
         this.reservationService = reservationService;
+        this.confirmationService = confirmationService;
     }
 
     @PostMapping
@@ -62,6 +68,15 @@ public class ReservationController {
     @GetMapping("/{id}")
     public ReservationResponse get(@PathVariable UUID id, Authentication authentication) {
         return reservationService.findById(id, CurrentUser.from(authentication));
+    }
+
+    // 200 si el pago se aprobo, 202 si el proveedor no respondio y la reserva quedo pendiente de pago
+    @PostMapping("/{id}/confirm")
+    public ResponseEntity<ConfirmReservationResponse> confirm(@PathVariable UUID id, Authentication authentication) {
+        ConfirmReservationResponse response = confirmationService.confirm(id, CurrentUser.from(authentication));
+        HttpStatus status = response.reservation().status() == ReservationStatus.CONFIRMED
+                ? HttpStatus.OK : HttpStatus.ACCEPTED;
+        return ResponseEntity.status(status).body(response);
     }
 
     @PostMapping("/{id}/cancel")

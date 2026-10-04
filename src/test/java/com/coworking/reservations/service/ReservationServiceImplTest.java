@@ -7,6 +7,7 @@ import com.coworking.reservations.domain.entity.User;
 import com.coworking.reservations.domain.enums.ReservationStatus;
 import com.coworking.reservations.domain.enums.Role;
 import com.coworking.reservations.domain.enums.SpaceType;
+import com.coworking.reservations.domain.event.ReservationCancelledEvent;
 import com.coworking.reservations.dto.request.CreateReservationRequest;
 import com.coworking.reservations.dto.response.ReservationResponse;
 import com.coworking.reservations.exception.InvalidReservationRequestException;
@@ -24,6 +25,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mapstruct.factory.Mappers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -55,6 +57,8 @@ class ReservationServiceImplTest {
     private SpaceRepository spaceRepository;
     @Mock
     private UserRepository userRepository;
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     private ReservationServiceImpl service;
     private Space space;
@@ -68,7 +72,7 @@ class ReservationServiceImplTest {
         Clock clock = Clock.fixed(Instant.from(NOW), ZoneOffset.UTC);
         service = new ReservationServiceImpl(reservationRepository, spaceRepository, userRepository,
                 new ReservationValidator(properties), new PricingService(),
-                Mappers.getMapper(ReservationMapper.class), clock);
+                Mappers.getMapper(ReservationMapper.class), clock, eventPublisher);
 
         space = new Space("Sala Roble", SpaceType.MEETING_ROOM, 6, "Piso 2", new BigDecimal("10.00"));
         ReflectionTestUtils.setField(space, "id", spaceId);
@@ -225,6 +229,7 @@ class ReservationServiceImplTest {
         ReservationResponse response = service.cancel(id, new CurrentUser(userId, false));
 
         assertThat(response.status()).isEqualTo(ReservationStatus.CANCELLED);
+        verify(eventPublisher).publishEvent(any(ReservationCancelledEvent.class));
     }
 
     @Test
@@ -246,6 +251,7 @@ class ReservationServiceImplTest {
         assertThatThrownBy(() -> service.cancel(id, new CurrentUser(UUID.randomUUID(), false)))
                 .isInstanceOf(ResourceNotFoundException.class);
         verify(reservationRepository, never()).saveAndFlush(any());
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
     }
 
     @Test

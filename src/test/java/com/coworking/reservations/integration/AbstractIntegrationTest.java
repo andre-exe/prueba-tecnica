@@ -1,6 +1,7 @@
 package com.coworking.reservations.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.github.tomakehurst.wiremock.WireMockServer;
 import org.junit.jupiter.api.Assertions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -12,6 +13,8 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
 
 import java.time.OffsetDateTime;
@@ -28,8 +31,21 @@ public abstract class AbstractIntegrationTest {
     @ServiceConnection
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine");
 
+    // el mismo mock del compose: lee los stubs de ./wiremock/mappings, asi los tests usan los tokens reales de la demo
+    protected static final WireMockServer WIREMOCK = new WireMockServer(
+            com.github.tomakehurst.wiremock.core.WireMockConfiguration.options()
+                    .dynamicPort()
+                    .usingFilesUnderDirectory("wiremock")
+                    .globalTemplating(true));
+
     static {
         POSTGRES.start();
+        WIREMOCK.start();
+    }
+
+    @DynamicPropertySource
+    static void paymentProperties(DynamicPropertyRegistry registry) {
+        registry.add("app.payment.base-url", WIREMOCK::baseUrl);
     }
 
     protected static final String PASSWORD = "Secreta123";
@@ -68,12 +84,17 @@ public abstract class AbstractIntegrationTest {
 
     protected ResponseEntity<String> createReservation(String token, UUID spaceId, OffsetDateTime start,
                                                        OffsetDateTime end, int attendees) {
+        return createReservation(token, spaceId, start, end, attendees, "tok_ok");
+    }
+
+    protected ResponseEntity<String> createReservation(String token, UUID spaceId, OffsetDateTime start,
+                                                       OffsetDateTime end, int attendees, String paymentMethod) {
         return send(HttpMethod.POST, "/api/v1/reservations", token, Map.of(
                 "spaceId", spaceId.toString(),
                 "startTime", start.toString(),
                 "endTime", end.toString(),
                 "attendees", attendees,
-                "paymentMethod", "tok_ok"));
+                "paymentMethod", paymentMethod));
     }
 
     protected ResponseEntity<String> send(HttpMethod method, String path, String token, Object body) {

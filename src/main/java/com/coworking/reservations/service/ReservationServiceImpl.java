@@ -4,6 +4,8 @@ import com.coworking.reservations.domain.entity.Reservation;
 import com.coworking.reservations.domain.entity.Space;
 import com.coworking.reservations.domain.entity.User;
 import com.coworking.reservations.domain.enums.ReservationStatus;
+import com.coworking.reservations.domain.event.ReservationCancelledEvent;
+import com.coworking.reservations.domain.event.ReservationSnapshot;
 import com.coworking.reservations.dto.request.CreateReservationRequest;
 import com.coworking.reservations.dto.request.ReservationFilter;
 import com.coworking.reservations.dto.response.PageResponse;
@@ -16,6 +18,7 @@ import com.coworking.reservations.repository.SpaceRepository;
 import com.coworking.reservations.repository.UserRepository;
 import com.coworking.reservations.repository.specification.ReservationSpecifications;
 import com.coworking.reservations.security.CurrentUser;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,10 +44,12 @@ public class ReservationServiceImpl implements ReservationService {
     private final PricingService pricingService;
     private final ReservationMapper reservationMapper;
     private final Clock clock;
+    private final ApplicationEventPublisher eventPublisher;
 
     public ReservationServiceImpl(ReservationRepository reservationRepository, SpaceRepository spaceRepository,
                                   UserRepository userRepository, ReservationValidator validator,
-                                  PricingService pricingService, ReservationMapper reservationMapper, Clock clock) {
+                                  PricingService pricingService, ReservationMapper reservationMapper, Clock clock,
+                                  ApplicationEventPublisher eventPublisher) {
         this.reservationRepository = reservationRepository;
         this.spaceRepository = spaceRepository;
         this.userRepository = userRepository;
@@ -52,6 +57,7 @@ public class ReservationServiceImpl implements ReservationService {
         this.pricingService = pricingService;
         this.reservationMapper = reservationMapper;
         this.clock = clock;
+        this.eventPublisher = eventPublisher;
     }
 
     @Override
@@ -99,6 +105,7 @@ public class ReservationServiceImpl implements ReservationService {
     public ReservationResponse cancel(UUID id, CurrentUser requester) {
         Reservation reservation = findVisible(id, requester);
         reservation.cancel(OffsetDateTime.now(clock));
+        eventPublisher.publishEvent(new ReservationCancelledEvent(ReservationSnapshot.of(reservation)));
         return reservationMapper.toResponse(reservationRepository.saveAndFlush(reservation));
     }
 
