@@ -56,7 +56,8 @@ class GlobalExceptionHandlerTest {
             "optimistic-lock, 409, CONCURRENT_UPDATE",
             "exclusion, 409, RESERVATION_OVERLAP",
             "unique, 409, DUPLICATE_RESOURCE",
-            "no-resource, 404, NOT_FOUND"
+            "no-resource, 404, NOT_FOUND",
+            "bad-sort, 400, INVALID_SORT"
     })
     void mapsExceptionsToProblemDetail(String path, int expectedStatus, String expectedCode) throws Exception {
         mockMvc.perform(get("/fail/" + path))
@@ -115,6 +116,7 @@ class GlobalExceptionHandlerTest {
                 case "optimistic-lock" -> throw new OptimisticLockingFailureException("x");
                 case "exclusion" -> throw new DataIntegrityViolationException("x", new SQLException("x", "23P01"));
                 case "no-resource" -> throw new org.springframework.web.servlet.resource.NoResourceFoundException(org.springframework.http.HttpMethod.GET, "nada");
+                case "bad-sort" -> throw new org.springframework.data.mapping.PropertyReferenceException("noexiste", org.springframework.data.util.TypeInformation.of(String.class), java.util.List.of());
                 case "unique" -> throw new DataIntegrityViolationException("x", new SQLException("x", "23505"));
                 default -> throw new IllegalStateException("secreto interno");
             }

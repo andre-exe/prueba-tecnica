@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.data.mapping.PropertyReferenceException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -13,6 +14,8 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.beans.TypeMismatchException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -82,6 +85,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return handleUnexpected(ex, request);
     }
 
+    @ExceptionHandler(PropertyReferenceException.class)
+    ResponseEntity<Object> handleInvalidSort(PropertyReferenceException ex, WebRequest request) {
+        return build(ex, HttpStatus.BAD_REQUEST, "INVALID_SORT",
+                "No se puede ordenar por el campo '" + ex.getPropertyName() + "'", null, request);
+    }
+
     @ExceptionHandler(Exception.class)
     ResponseEntity<Object> handleUnexpected(Exception ex, WebRequest request) {
         log.error("error no controlado", ex);
@@ -98,6 +107,21 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         ex.getBindingResult().getGlobalErrors()
                 .forEach(e -> errors.add(new ApiFieldError(e.getObjectName(), e.getDefaultMessage())));
         return build(ex, HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Hay datos invalidos en la peticion", errors, request);
+    }
+
+    @Override
+    protected ResponseEntity<Object> handleHttpMessageNotReadable(HttpMessageNotReadableException ex,
+                                                                  HttpHeaders headers, HttpStatusCode status,
+                                                                  WebRequest request) {
+        return build(ex, HttpStatus.BAD_REQUEST, "MALFORMED_REQUEST",
+                "El cuerpo de la petición no se pudo leer, revisa el JSON y los valores permitidos", null, request);
+    }
+
+    @Override
+    protected ResponseEntity<Object> handleTypeMismatch(TypeMismatchException ex, HttpHeaders headers,
+                                                        HttpStatusCode status, WebRequest request) {
+        return build(ex, HttpStatus.BAD_REQUEST, "INVALID_PARAMETER",
+                "El valor '" + ex.getValue() + "' no es válido para el parámetro '" + ex.getPropertyName() + "'", null, request);
     }
 
     @Override
