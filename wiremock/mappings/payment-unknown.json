@@ -1,0 +1,17 @@
+{
+  "name": "cualquier otro token - metodo de pago no reconocido",
+  "priority": 10,
+  "request": {
+    "method": "POST",
+    "urlPath": "/api/payments/validate"
+  },
+  "response": {
+    "status": 200,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": {
+      "approved": false,
+      "transactionId": null,
+      "reason": "INVALID_PAYMENT_METHOD"
+    }
+  }
+}

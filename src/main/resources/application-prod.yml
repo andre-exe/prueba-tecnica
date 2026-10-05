@@ -14,6 +14,13 @@ app:
     password: ${ADMIN_PASSWORD}
     full-name: ${ADMIN_FULL_NAME:Administrador}
 
+# swagger prendido por defecto para que la demo funcione, en un ambiente real se apaga con SWAGGER_ENABLED=false
+springdoc:
+  api-docs:
+    enabled: ${SWAGGER_ENABLED:true}
+  swagger-ui:
+    enabled: ${SWAGGER_ENABLED:true}
+
 logging:
   level:
     root: INFO

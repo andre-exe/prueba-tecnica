@@ -1,0 +1,503 @@
+# coleccion de ejemplos para la extension "REST Client" de vscode (humao.rest-client)
+# cada bloque separado por ### se ejecuta con el enlace "Send Request" que aparece encima de la primera linea.
+# orden sugerido: corre los logins primero, los tokens se guardan solos en las variables de abajo.
+# las fechas se calculan solas con {{$datetime}}, asi las reservas siempre quedan en el futuro.
+
+@host = http://localhost:8080
+@baseUrl = {{host}}/api/v1
+@wiremock = http://localhost:8089
+@json = application/json
+
+@adminToken = {{loginAdmin.response.body.$.accessToken}}
+@userToken = {{loginMaria.response.body.$.accessToken}}
+@user2Token = {{loginLuis.response.body.$.accessToken}}
+@spaceId = {{createRoom.response.body.$.id}}
+@space2Id = {{createDesk.response.body.$.id}}
+
+
+
+# 1. autenticacion
+
+#sin token: 401
+GET {{baseUrl}}/auth/me
+
+#registrar a maria (siempre rol USER): 201
+POST {{baseUrl}}/auth/register
+Content-Type: {{json}}
+
+{ "email": "maria@test.com", "password": "Secreta123", "fullName": "Maria" }
+
+### registrar a luis: 201
+POST {{baseUrl}}/auth/register
+Content-Type: {{json}}
+
+{ "email": "luis@test.com", "password": "Secreta123", "fullName": "Luis" }
+
+### correo repetido, sin importar mayusculas: 409
+POST {{baseUrl}}/auth/register
+Content-Type: {{json}}
+
+{ "email": "MARIA@test.com", "password": "Secreta123", "fullName": "Maria" }
+
+### datos invalidos: 400 con un error por campo
+POST {{baseUrl}}/auth/register
+Content-Type: {{json}}
+
+{ "email": "mal", "password": "123", "fullName": "" }
+
+### json roto: 400
+POST {{baseUrl}}/auth/register
+Content-Type: {{json}}
+
+{ esto no es json
+
+### clave incorrecta: 401
+POST {{baseUrl}}/auth/login
+Content-Type: {{json}}
+
+{ "email": "maria@test.com", "password": "incorrecta" }
+
+### login de maria (usuario normal): 200
+# @name loginMaria
+POST {{baseUrl}}/auth/login
+Content-Type: {{json}}
+
+{ "email": "maria@test.com", "password": "Secreta123" }
+
+### login de luis (otro usuario normal): 200
+# @name loginLuis
+POST {{baseUrl}}/auth/login
+Content-Type: {{json}}
+
+{ "email": "luis@test.com", "password": "Secreta123" }
+
+### login del admin (se crea solo al arrancar): 200
+# @name loginAdmin
+POST {{baseUrl}}/auth/login
+Content-Type: {{json}}
+
+{ "email": "admin@coworking.local", "password": "Admin1234!" }
+
+### quien soy: 200
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{userToken}}
+
+### token invalido: 401
+GET {{baseUrl}}/auth/me
+Authorization: Bearer abc.def.ghi
+
+
+# 2. espacios
+
+### un usuario normal no puede crear: 403
+POST {{baseUrl}}/spaces
+Authorization: Bearer {{userToken}}
+Content-Type: {{json}}
+
+{ "name": "Intruso", "type": "HOT_DESK", "capacity": 1, "location": "Piso 1", "hourlyRate": 5 }
+
+### crear una sala (admin): 201
+# @name createRoom
+POST {{baseUrl}}/spaces
+Authorization: Bearer {{adminToken}}
+Content-Type: {{json}}
+
+{ "name": "Sala Roble", "type": "MEETING_ROOM", "capacity": 8, "location": "Piso 2", "hourlyRate": 15.50 }
+
+### crear un puesto: 201
+# @name createDesk
+POST {{baseUrl}}/spaces
+Authorization: Bearer {{adminToken}}
+Content-Type: {{json}}
+
+{ "name": "Puesto 1", "type": "HOT_DESK", "capacity": 1, "location": "Piso 1", "hourlyRate": 5 }
+
+### crear una oficina privada: 201
+POST {{baseUrl}}/spaces
+Authorization: Bearer {{adminToken}}
+Content-Type: {{json}}
+
+{ "name": "Oficina Norte", "type": "PRIVATE_OFFICE", "capacity": 6, "location": "Piso 3", "hourlyRate": 40 }
+
+### nombre repetido: 409
+POST {{baseUrl}}/spaces
+Authorization: Bearer {{adminToken}}
+Content-Type: {{json}}
+
+{ "name": "Sala Roble", "type": "MEETING_ROOM", "capacity": 8, "location": "Piso 2", "hourlyRate": 15.50 }
+
+### datos invalidos: 400 con 4 errores
+POST {{baseUrl}}/spaces
+Authorization: Bearer {{adminToken}}
+Content-Type: {{json}}
+
+{ "name": "", "type": "HOT_DESK", "capacity": 0, "location": "", "hourlyRate": -1 }
+
+### listar (paginado, ordenado por nombre): 200
+GET {{baseUrl}}/spaces
+Authorization: Bearer {{userToken}}
+
+### filtrar por tipo y capacidad minima
+GET {{baseUrl}}/spaces?type=MEETING_ROOM&minCapacity=5
+Authorization: Bearer {{userToken}}
+
+### filtrar por ubicacion (sin distinguir mayusculas)
+GET {{baseUrl}}/spaces?location=piso 3
+Authorization: Bearer {{userToken}}
+
+### paginar: segunda pagina de 1 elemento
+GET {{baseUrl}}/spaces?size=1&page=1
+Authorization: Bearer {{userToken}}
+
+### el tamano maximo de pagina es 50
+GET {{baseUrl}}/spaces?size=1000
+Authorization: Bearer {{userToken}}
+
+### orden invalido: 400
+GET {{baseUrl}}/spaces?sort=noexiste,asc
+Authorization: Bearer {{userToken}}
+
+### tipo invalido: 400
+GET {{baseUrl}}/spaces?type=XX
+Authorization: Bearer {{userToken}}
+
+### obtener uno: 200
+GET {{baseUrl}}/spaces/{{spaceId}}
+Authorization: Bearer {{userToken}}
+
+### actualizar (admin): 200
+PUT {{baseUrl}}/spaces/{{spaceId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: {{json}}
+
+{ "name": "Sala Roble", "type": "MEETING_ROOM", "capacity": 12, "location": "Piso 2", "hourlyRate": 20 }
+
+### desactivar el puesto (borrado logico): 204, y de nuevo 204
+DELETE {{baseUrl}}/spaces/{{space2Id}}
+Authorization: Bearer {{adminToken}}
+
+### el usuario normal ya no ve el puesto desactivado: 404
+GET {{baseUrl}}/spaces/{{space2Id}}
+Authorization: Bearer {{userToken}}
+
+### el admin si lo ve, con active=false: 200
+GET {{baseUrl}}/spaces?active=false
+Authorization: Bearer {{adminToken}}
+
+
+# 3. reservas: crear y reglas de negocio
+
+### camino feliz: 201, estado PENDING y precio = tarifa x horas
+# @name createReservation
+POST {{baseUrl}}/reservations
+Authorization: Bearer {{userToken}}
+Content-Type: {{json}}
+
+{
+  "spaceId": "{{spaceId}}",
+  "startTime": "{{$datetime iso8601 240 h}}",
+  "endTime": "{{$datetime iso8601 241 h}}",
+  "attendees": 4,
+  "paymentMethod": "tok_ok"
+}
+
+### solapada con la anterior: 409
+POST {{baseUrl}}/reservations
+Authorization: Bearer {{userToken}}
+Content-Type: {{json}}
+
+{
+  "spaceId": "{{spaceId}}",
+  "startTime": "{{$datetime iso8601 14430 m}}",
+  "endTime": "{{$datetime iso8601 14490 m}}",
+  "attendees": 2,
+  "paymentMethod": "tok_ok"
+}
+
+### el mismo horario en otro espacio: 201
+POST {{baseUrl}}/reservations
+Authorization: Bearer {{adminToken}}
+Content-Type: {{json}}
+
+{
+  "spaceId": "{{space2Id}}",
+  "startTime": "{{$datetime iso8601 240 h}}",
+  "endTime": "{{$datetime iso8601 241 h}}",
+  "attendees": 1,
+  "paymentMethod": "tok_ok"
+}
+
+### fin antes que inicio: 422
+POST {{baseUrl}}/reservations
+Authorization: Bearer {{userToken}}
+Content-Type: {{json}}
+
+{ "spaceId": "{{spaceId}}", "startTime": "{{$datetime iso8601 241 h}}", "endTime": "{{$datetime iso8601 240 h}}", "attendees": 2, "paymentMethod": "tok_ok" }
+
+### en el pasado: 422
+POST {{baseUrl}}/reservations
+Authorization: Bearer {{userToken}}
+Content-Type: {{json}}
+
+{ "spaceId": "{{spaceId}}", "startTime": "2020-01-01T10:00:00Z", "endTime": "2020-01-01T11:00:00Z", "attendees": 2, "paymentMethod": "tok_ok" }
+
+### demasiado corta, 10 minutos: 422
+POST {{baseUrl}}/reservations
+Authorization: Bearer {{userToken}}
+Content-Type: {{json}}
+
+{ "spaceId": "{{spaceId}}", "startTime": "{{$datetime iso8601 300 h}}", "endTime": "{{$datetime iso8601 18010 m}}", "attendees": 2, "paymentMethod": "tok_ok" }
+
+### demasiado larga, 9 horas: 422
+POST {{baseUrl}}/reservations
+Authorization: Bearer {{userToken}}
+Content-Type: {{json}}
+
+{ "spaceId": "{{spaceId}}", "startTime": "{{$datetime iso8601 300 h}}", "endTime": "{{$datetime iso8601 309 h}}", "attendees": 2, "paymentMethod": "tok_ok" }
+
+### con mas de 90 dias de anticipacion: 422
+POST {{baseUrl}}/reservations
+Authorization: Bearer {{userToken}}
+Content-Type: {{json}}
+
+{ "spaceId": "{{spaceId}}", "startTime": "{{$datetime iso8601 3000 h}}", "endTime": "{{$datetime iso8601 3001 h}}", "attendees": 2, "paymentMethod": "tok_ok" }
+
+### mas asistentes que la capacidad: 422
+POST {{baseUrl}}/reservations
+Authorization: Bearer {{userToken}}
+Content-Type: {{json}}
+
+{ "spaceId": "{{spaceId}}", "startTime": "{{$datetime iso8601 300 h}}", "endTime": "{{$datetime iso8601 301 h}}", "attendees": 500, "paymentMethod": "tok_ok" }
+
+### espacio desactivado: 422
+POST {{baseUrl}}/reservations
+Authorization: Bearer {{userToken}}
+Content-Type: {{json}}
+
+{ "spaceId": "{{space2Id}}", "startTime": "{{$datetime iso8601 300 h}}", "endTime": "{{$datetime iso8601 301 h}}", "attendees": 1, "paymentMethod": "tok_ok" }
+
+### espacio inexistente: 404
+POST {{baseUrl}}/reservations
+Authorization: Bearer {{userToken}}
+Content-Type: {{json}}
+
+{ "spaceId": "00000000-0000-0000-0000-000000000000", "startTime": "{{$datetime iso8601 300 h}}", "endTime": "{{$datetime iso8601 301 h}}", "attendees": 1, "paymentMethod": "tok_ok" }
+
+### body vacio: 400 con los campos que faltan
+POST {{baseUrl}}/reservations
+Authorization: Bearer {{userToken}}
+Content-Type: {{json}}
+
+{}
+
+
+# 4. reservas: consultar (cada usuario ve lo suyo, el admin todo)
+
+### las de maria
+GET {{baseUrl}}/reservations
+Authorization: Bearer {{userToken}}
+
+### las de luis: no ve las de maria
+GET {{baseUrl}}/reservations
+Authorization: Bearer {{user2Token}}
+
+### el admin ve todas
+GET {{baseUrl}}/reservations
+Authorization: Bearer {{adminToken}}
+
+### filtros: estado, espacio y rango de fechas de inicio
+GET {{baseUrl}}/reservations?status=PENDING&spaceId={{spaceId}}&from={{$datetime iso8601 9 d}}&to={{$datetime iso8601 12 d}}
+Authorization: Bearer {{adminToken}}
+
+### paginado y ordenado
+GET {{baseUrl}}/reservations?size=5&page=0&sort=startTime,asc
+Authorization: Bearer {{adminToken}}
+
+### orden invalido: 400
+GET {{baseUrl}}/reservations?sort=nada
+Authorization: Bearer {{adminToken}}
+
+### ver una reserva propia: 200
+GET {{baseUrl}}/reservations/{{createReservation.response.body.$.id}}
+Authorization: Bearer {{userToken}}
+
+### la misma reserva con otro usuario: 404 (no se revela que existe)
+GET {{baseUrl}}/reservations/{{createReservation.response.body.$.id}}
+Authorization: Bearer {{user2Token}}
+
+### la misma reserva con el admin: 200
+GET {{baseUrl}}/reservations/{{createReservation.response.body.$.id}}
+Authorization: Bearer {{adminToken}}
+
+
+# 5. cancelar y completar
+
+### cancelar con otro usuario: 404
+POST {{baseUrl}}/reservations/{{createReservation.response.body.$.id}}/cancel
+Authorization: Bearer {{user2Token}}
+
+### cancelar con el dueno: 200, estado CANCELLED
+POST {{baseUrl}}/reservations/{{createReservation.response.body.$.id}}/cancel
+Authorization: Bearer {{userToken}}
+
+### cancelar otra vez: 409, un estado final no admite acciones
+POST {{baseUrl}}/reservations/{{createReservation.response.body.$.id}}/cancel
+Authorization: Bearer {{userToken}}
+
+### completar con un usuario normal: 403
+POST {{baseUrl}}/reservations/{{createReservation.response.body.$.id}}/complete
+Authorization: Bearer {{userToken}}
+
+### completar con admin una reserva que no esta confirmada: 409
+POST {{baseUrl}}/reservations/{{createReservation.response.body.$.id}}/complete
+Authorization: Bearer {{adminToken}}
+
+
+# 6. confirmar y pagar. el token de pago se elige al crear la reserva
+
+### reserva con tok_ok
+# @name resOk
+POST {{baseUrl}}/reservations
+Authorization: Bearer {{userToken}}
+Content-Type: {{json}}
+
+{ "spaceId": "{{spaceId}}", "startTime": "{{$datetime iso8601 264 h}}", "endTime": "{{$datetime iso8601 265 h}}", "attendees": 2, "paymentMethod": "tok_ok" }
+
+### confirmar: 200, CONFIRMED. a los 2 segundos aparece el correo en el log de la app
+POST {{baseUrl}}/reservations/{{resOk.response.body.$.id}}/confirm
+Authorization: Bearer {{userToken}}
+
+### confirmar otra vez: 409, y el proveedor no recibe una peticion nueva
+POST {{baseUrl}}/reservations/{{resOk.response.body.$.id}}/confirm
+Authorization: Bearer {{userToken}}
+
+### reserva con tok_declined
+# @name resDeclined
+POST {{baseUrl}}/reservations
+Authorization: Bearer {{userToken}}
+Content-Type: {{json}}
+
+{ "spaceId": "{{spaceId}}", "startTime": "{{$datetime iso8601 288 h}}", "endTime": "{{$datetime iso8601 289 h}}", "attendees": 2, "paymentMethod": "tok_declined" }
+
+### confirmar: 402 PAYMENT_DECLINED, la reserva sigue PENDING
+POST {{baseUrl}}/reservations/{{resDeclined.response.body.$.id}}/confirm
+Authorization: Bearer {{userToken}}
+
+### reserva con tok_slow
+# @name resSlow
+POST {{baseUrl}}/reservations
+Authorization: Bearer {{userToken}}
+Content-Type: {{json}}
+
+{ "spaceId": "{{spaceId}}", "startTime": "{{$datetime iso8601 312 h}}", "endTime": "{{$datetime iso8601 313 h}}", "attendees": 2, "paymentMethod": "tok_slow" }
+
+### confirmar: el proveedor tarda 5 s y la app corta a los 3 s. 202 PENDING_PAYMENT
+POST {{baseUrl}}/reservations/{{resSlow.response.body.$.id}}/confirm
+Authorization: Bearer {{userToken}}
+
+### reserva con tok_flaky (alterna: respuesta lenta, conexion cortada, error 500)
+# @name resFlaky
+POST {{baseUrl}}/reservations
+Authorization: Bearer {{userToken}}
+Content-Type: {{json}}
+
+{ "spaceId": "{{spaceId}}", "startTime": "{{$datetime iso8601 336 h}}", "endTime": "{{$datetime iso8601 337 h}}", "attendees": 2, "paymentMethod": "tok_flaky" }
+
+### confirmar varias veces seguidas para ver el ciclo
+POST {{baseUrl}}/reservations/{{resFlaky.response.body.$.id}}/confirm
+Authorization: Bearer {{userToken}}
+
+
+# 7. demo del circuit breaker (umbrales: 5 llamadas minimas, 50% de fallas, 30 s abierto)
+
+### 7.1 estado inicial del circuito: CLOSED
+GET {{host}}/actuator/circuitbreakers
+Authorization: Bearer {{adminToken}}
+
+### 7.2 reserva con tok_error: el proveedor responde 500
+# @name resError
+POST {{baseUrl}}/reservations
+Authorization: Bearer {{userToken}}
+Content-Type: {{json}}
+
+{ "spaceId": "{{spaceId}}", "startTime": "{{$datetime iso8601 360 h}}", "endTime": "{{$datetime iso8601 361 h}}", "attendees": 2, "paymentMethod": "tok_error" }
+
+### 7.3 confirmar esta MISMA reserva 5 veces seguidas: cada una da 202. cada reintento cuenta como una falla
+POST {{baseUrl}}/reservations/{{resError.response.body.$.id}}/confirm
+Authorization: Bearer {{userToken}}
+
+### 7.4 despues de la quinta el circuito esta OPEN
+GET {{host}}/actuator/circuitbreakers
+Authorization: Bearer {{adminToken}}
+
+### 7.5 reserva con tok_ok
+# @name resWhileOpen
+POST {{baseUrl}}/reservations
+Authorization: Bearer {{userToken}}
+Content-Type: {{json}}
+
+{ "spaceId": "{{spaceId}}", "startTime": "{{$datetime iso8601 384 h}}", "endTime": "{{$datetime iso8601 385 h}}", "attendees": 2, "paymentMethod": "tok_ok" }
+
+### 7.6 con el circuito abierto responde 202 al instante aunque el token sea bueno: no se llama al proveedor
+POST {{baseUrl}}/reservations/{{resWhileOpen.response.body.$.id}}/confirm
+Authorization: Bearer {{userToken}}
+
+### 7.7 las peticiones que recibio el proveedor: no hay ninguna nueva
+GET {{wiremock}}/__admin/requests?limit=3
+
+### 7.8 espera 30 segundos: pasa solo a HALF_OPEN
+GET {{host}}/actuator/circuitbreakers
+Authorization: Bearer {{adminToken}}
+
+### 7.9 confirmar la reserva: en HALF_OPEN se permiten 3 llamadas de prueba. si salen bien el circuito se cierra
+POST {{baseUrl}}/reservations/{{resWhileOpen.response.body.$.id}}/confirm
+Authorization: Bearer {{userToken}}
+
+### 7.10 historial de eventos del circuito
+GET {{host}}/actuator/circuitbreakerevents/paymentService
+Authorization: Bearer {{adminToken}}
+
+### la salud de la app sigue en UP aunque el circuito este abierto
+GET {{host}}/actuator/health
+Authorization: Bearer {{adminToken}}
+
+
+# 8. reporte de ocupacion (solo admin) y cache
+
+### sin token: 401. con usuario normal: 403
+GET {{baseUrl}}/reports/occupancy?from={{$datetime iso8601 9 d}}&to={{$datetime iso8601 20 d}}
+Authorization: Bearer {{userToken}}
+
+### ocupacion por espacio. repite la misma consulta: la segunda sale de la cache
+GET {{baseUrl}}/reports/occupancy?from={{$datetime iso8601 9 d}}&to={{$datetime iso8601 20 d}}
+Authorization: Bearer {{adminToken}}
+
+### aciertos y fallos de la cache
+GET {{host}}/actuator/metrics/cache.gets?tag=cache:occupancyReport&tag=result:hit
+Authorization: Bearer {{adminToken}}
+
+### rango invalido: 400
+GET {{baseUrl}}/reports/occupancy?from=2030-06-02T00:00:00Z&to=2030-06-01T00:00:00Z
+Authorization: Bearer {{adminToken}}
+
+
+# 9. actuator y documentacion
+
+### health (publico)
+GET {{host}}/actuator/health
+
+### info: nombre de la app y datos del build (publico)
+GET {{host}}/actuator/info
+
+### metricas (solo admin)
+GET {{host}}/actuator/metrics
+Authorization: Bearer {{adminToken}}
+
+### una metrica
+GET {{host}}/actuator/metrics/jvm.memory.used
+Authorization: Bearer {{adminToken}}
+
+### contrato openapi
+GET {{host}}/v3/api-docs
+
+# swagger ui: abre http://localhost:8080/swagger-ui/index.html en el navegador, presiona Authorize y pega el token (sin la palabra Bearer)

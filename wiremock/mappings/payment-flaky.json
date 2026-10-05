@@ -1,0 +1,64 @@
+{
+  "mappings": [
+    {
+      "name": "tok_flaky - paso 1: responde bien pero con demora aleatoria",
+      "priority": 1,
+      "scenarioName": "flaky",
+      "requiredScenarioState": "Started",
+      "newScenarioState": "conexion-cortada",
+      "request": {
+        "method": "POST",
+        "urlPath": "/api/payments/validate",
+        "bodyPatterns": [
+          { "equalToJson": "{ \"paymentMethod\": \"tok_flaky\" }", "ignoreExtraElements": true }
+        ]
+      },
+      "response": {
+        "status": 200,
+        "delayDistribution": { "type": "uniform", "lower": 100, "upper": 2500 },
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": {
+          "approved": true,
+          "transactionId": "txn-demo-flaky",
+          "reason": null
+        }
+      }
+    },
+    {
+      "name": "tok_flaky - paso 2: corta la conexion",
+      "priority": 1,
+      "scenarioName": "flaky",
+      "requiredScenarioState": "conexion-cortada",
+      "newScenarioState": "error-500",
+      "request": {
+        "method": "POST",
+        "urlPath": "/api/payments/validate",
+        "bodyPatterns": [
+          { "equalToJson": "{ \"paymentMethod\": \"tok_flaky\" }", "ignoreExtraElements": true }
+        ]
+      },
+      "response": {
+        "fault": "CONNECTION_RESET_BY_PEER"
+      }
+    },
+    {
+      "name": "tok_flaky - paso 3: responde 500 y vuelve a empezar",
+      "priority": 1,
+      "scenarioName": "flaky",
+      "requiredScenarioState": "error-500",
+      "newScenarioState": "Started",
+      "request": {
+        "method": "POST",
+        "urlPath": "/api/payments/validate",
+        "bodyPatterns": [
+          { "equalToJson": "{ \"paymentMethod\": \"tok_flaky\" }", "ignoreExtraElements": true }
+        ]
+      },
+      "response": {
+        "status": 500,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": { "error": "INTERNAL_SERVER_ERROR" }
+      }
+    }
+  ]
+}

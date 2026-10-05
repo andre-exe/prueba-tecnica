@@ -1,0 +1,20 @@
+{
+  "name": "tok_ok - pago aprobado",
+  "priority": 1,
+  "request": {
+    "method": "POST",
+    "urlPath": "/api/payments/validate",
+    "bodyPatterns": [
+      { "equalToJson": "{ \"paymentMethod\": \"tok_ok\" }", "ignoreExtraElements": true }
+    ]
+  },
+  "response": {
+    "status": 200,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": {
+      "approved": true,
+      "transactionId": "txn-demo-ok",
+      "reason": null
+    }
+  }
+}

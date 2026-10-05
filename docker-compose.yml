@@ -1,13 +1,10 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: coworking-postgres
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-coworking}
       POSTGRES_USER: ${POSTGRES_USER:-coworking}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-coworking}
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -16,15 +13,41 @@ services:
       timeout: 5s
       retries: 10
 
-  # Mock del servicio externo de pago (stubs deterministas en ./wiremock/mappings).
+  # proveedor de pago falso, los stubs viven en ./wiremock/mappings
   wiremock:
     image: wiremock/wiremock:3.13.2
-    container_name: coworking-wiremock
-    command: ["--global-response-templating", "--verbose"]
+    command: ["--verbose"]
     ports:
-      - "8089:8080"
+      - "${WIREMOCK_PORT:-8089}:8080"
     volumes:
       - ./wiremock/mappings:/home/wiremock/mappings:ro
+
+  app:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+      wiremock:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-coworking}
+      DB_USERNAME: ${POSTGRES_USER:-coworking}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-coworking}
+      JWT_SECRET: ${JWT_SECRET:-demo-secret-demo-secret-demo-secret-1234}
+      PAYMENT_BASE_URL: http://wiremock:8080
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@coworking.local}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-Admin1234!}
+      ADMIN_FULL_NAME: ${ADMIN_FULL_NAME:-Administrador}
+      SWAGGER_ENABLED: ${SWAGGER_ENABLED:-true}
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 90s
 
 volumes:
   postgres_data:

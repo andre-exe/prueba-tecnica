@@ -1,0 +1,29 @@
+app:
+  jwt:
+    secret: test-secret-test-secret-test-secret-123456
+  bootstrap-admin:
+    email: admin@test.local
+    password: Admin1234!
+    full-name: Admin de pruebas
+  reservation:
+    completion-job-cron: "-"
+  notification:
+    simulated-delay: 3s
+  payment:
+    connect-timeout: 1s
+    read-timeout: 3s
+
+# umbrales bajos para poder abrir el circuito en pocas llamadas
+resilience4j:
+  circuitbreaker:
+    instances:
+      paymentService:
+        sliding-window-size: 4
+        minimum-number-of-calls: 3
+        wait-duration-in-open-state: 3s
+        permitted-number-of-calls-in-half-open-state: 1
+
+logging:
+  level:
+    root: WARN
+    com.coworking.reservations: INFO

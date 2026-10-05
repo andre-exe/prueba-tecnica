@@ -17,6 +17,32 @@ spring:
   mvc:
     problemdetails:
       enabled: true
+  data:
+    web:
+      pageable:
+        default-page-size: 20
+        max-page-size: 50
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,circuitbreakers,circuitbreakerevents
+  endpoint:
+    health:
+      show-details: when-authorized
+      roles: ADMIN
+  health:
+    circuitbreakers:
+      enabled: true
+  info:
+    env:
+      enabled: true
+
+info:
+  app:
+    name: coworking-reservations
+    description: API de reservas de espacios de coworking
 
 server:
   port: 8080
@@ -48,3 +74,26 @@ app:
   jwt:
     issuer: coworking-reservations
     expiration: 1h
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      paymentService:
+        register-health-indicator: true
+        allow-health-indicator-to-fail: false
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        slow-call-rate-threshold: 50
+        slow-call-duration-threshold: 2s
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+        # RestClientException cubre timeouts de conexion y de lectura, conexiones cortadas y errores 5xx del proveedor
+        record-exceptions:
+          - org.springframework.web.client.RestClientException
+        # un rechazo de pago es una respuesta normal del negocio y un 4xx es culpa de la peticion, ninguno debe abrir el circuito
+        ignore-exceptions:
+          - com.coworking.reservations.exception.PaymentDeclinedException
+          - org.springframework.web.client.HttpClientErrorException
