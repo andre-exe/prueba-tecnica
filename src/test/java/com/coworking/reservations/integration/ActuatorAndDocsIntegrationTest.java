@@ -90,6 +90,14 @@ class ActuatorAndDocsIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void cacheHitsAndMissesAreVisibleInMetrics() throws Exception {
+        ResponseEntity<String> response = get("/actuator/metrics/cache.gets?tag=cache:occupancyReport", adminToken);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        assertThat(json(response).get("name").asText()).isEqualTo("cache.gets");
+    }
+
+    @Test
     void circuitBreakerStateIsVisibleInActuator() throws Exception {
         assertThat(get("/actuator/circuitbreakers", userToken).getStatusCode().value()).isEqualTo(403);
 

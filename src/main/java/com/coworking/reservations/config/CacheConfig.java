@@ -19,7 +19,8 @@ public class CacheConfig {
         CaffeineCacheManager cacheManager = new CaffeineCacheManager(OCCUPANCY_REPORT);
         cacheManager.setCaffeine(Caffeine.newBuilder()
                 .expireAfterWrite(properties.ttl())
-                .maximumSize(properties.maxSize()));
+                .maximumSize(properties.maxSize())
+                .recordStats());
         return cacheManager;
     }
 }

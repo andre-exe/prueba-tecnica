@@ -57,7 +57,10 @@ class GlobalExceptionHandlerTest {
             "exclusion, 409, RESERVATION_OVERLAP",
             "unique, 409, DUPLICATE_RESOURCE",
             "no-resource, 404, NOT_FOUND",
-            "bad-sort, 400, INVALID_SORT"
+            "bad-sort, 400, INVALID_SORT",
+            "other-integrity, 500, INTERNAL_ERROR",
+            "no-sqlstate, 500, INTERNAL_ERROR",
+            "constraint, 400, VALIDATION_ERROR"
     })
     void mapsExceptionsToProblemDetail(String path, int expectedStatus, String expectedCode) throws Exception {
         mockMvc.perform(get("/fail/" + path))
@@ -75,6 +78,20 @@ class GlobalExceptionHandlerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
                 .andExpect(jsonPath("$.errors", hasSize(2)));
+    }
+
+    @Test
+    void validationOfASingleParameterReturnsItsFieldError() throws Exception {
+        mockMvc.perform(get("/limit?size=0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.errors", hasSize(1)))
+                .andExpect(jsonPath("$.errors[0].field").value("size"));
+    }
+
+    @Test
+    void aMissingRequiredParameterReturns400() throws Exception {
+        mockMvc.perform(get("/limit")).andExpect(status().isBadRequest());
     }
 
     @Test
@@ -117,6 +134,10 @@ class GlobalExceptionHandlerTest {
                 case "exclusion" -> throw new DataIntegrityViolationException("x", new SQLException("x", "23P01"));
                 case "no-resource" -> throw new org.springframework.web.servlet.resource.NoResourceFoundException(org.springframework.http.HttpMethod.GET, "nada");
                 case "bad-sort" -> throw new org.springframework.data.mapping.PropertyReferenceException("noexiste", org.springframework.data.util.TypeInformation.of(String.class), java.util.List.of());
+                case "other-integrity" -> throw new DataIntegrityViolationException("x", new SQLException("x", "23503"));
+                case "no-sqlstate" -> throw new DataIntegrityViolationException("x");
+                case "constraint" -> throw new jakarta.validation.ConstraintViolationException(
+                        jakarta.validation.Validation.buildDefaultValidatorFactory().getValidator().validate(new ItemRequest("", -1)));
                 case "unique" -> throw new DataIntegrityViolationException("x", new SQLException("x", "23505"));
                 default -> throw new IllegalStateException("secreto interno");
             }
@@ -124,6 +145,10 @@ class GlobalExceptionHandlerTest {
 
         @PostMapping("/items")
         void create(@Valid @RequestBody ItemRequest request) {
+        }
+
+        @GetMapping("/limit")
+        void limit(@org.springframework.web.bind.annotation.RequestParam @jakarta.validation.constraints.Min(1) int size) {
         }
 
         @GetMapping("/items/{id}")
