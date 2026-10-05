@@ -1,0 +1,6 @@
+# solo para desarrollo local: publica postgres en tu maquina para usar dbeaver o correr la app con el perfil dev
+# no se carga solo, hay que pedirlo: docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d postgres wiremock
+services:
+  postgres:
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
