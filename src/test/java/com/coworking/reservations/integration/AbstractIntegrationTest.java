@@ -35,12 +35,26 @@ public abstract class AbstractIntegrationTest {
     protected static final WireMockServer WIREMOCK = new WireMockServer(
             com.github.tomakehurst.wiremock.core.WireMockConfiguration.options()
                     .dynamicPort()
-                    .usingFilesUnderDirectory("wiremock")
-                    .globalTemplating(true));
+                    .usingFilesUnderDirectory("wiremock"));
 
     static {
         POSTGRES.start();
         WIREMOCK.start();
+        warmUpWireMock();
+    }
+
+    // la primera llamada a wiremock siempre es mas lenta, se hace una vez antes de los tests para que no cuente como timeout
+    private static void warmUpWireMock() {
+        try {
+            java.net.http.HttpRequest request = java.net.http.HttpRequest.newBuilder(
+                            java.net.URI.create(WIREMOCK.baseUrl() + "/api/payments/validate"))
+                    .header("Content-Type", "application/json")
+                    .POST(java.net.http.HttpRequest.BodyPublishers.ofString("{\"paymentMethod\":\"tok_ok\"}"))
+                    .build();
+            java.net.http.HttpClient.newHttpClient().send(request, java.net.http.HttpResponse.BodyHandlers.discarding());
+        } catch (Exception e) {
+            // si falla el calentamiento los tests siguen, solo pueden salir mas lentos la primera vez
+        }
     }
 
     @DynamicPropertySource

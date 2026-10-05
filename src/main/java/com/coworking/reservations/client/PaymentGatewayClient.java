@@ -11,6 +11,7 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClient;
 
 @Component
@@ -60,6 +61,9 @@ public class PaymentGatewayClient {
         }
         if (cause instanceof HttpServerErrorException) {
             return "error 5xx del proveedor";
+        }
+        if (cause instanceof RestClientException) {
+            return "el proveedor no termino de responder a tiempo";
         }
         return "error inesperado";
     }

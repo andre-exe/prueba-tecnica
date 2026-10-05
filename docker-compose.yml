@@ -20,7 +20,7 @@ services:
   wiremock:
     image: wiremock/wiremock:3.13.2
     container_name: coworking-wiremock
-    command: ["--global-response-templating", "--verbose"]
+    command: ["--verbose"]
     ports:
       - "8089:8080"
     volumes:

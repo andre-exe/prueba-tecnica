@@ -5,7 +5,7 @@ import com.coworking.reservations.dto.response.ReservationResponse;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
-@Mapper
+@Mapper(uses = UtcTime.class)
 public interface ReservationMapper {
 
     @Mapping(source = "space.id", target = "spaceId")

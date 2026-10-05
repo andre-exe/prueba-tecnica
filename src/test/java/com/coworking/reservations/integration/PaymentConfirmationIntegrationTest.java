@@ -127,6 +127,8 @@ class PaymentConfirmationIntegrationTest extends AbstractIntegrationTest {
 
         assertThat(response.getStatusCode().value()).isEqualTo(202);
         assertThat(statusOf(id)).isEqualTo("PENDING_PAYMENT");
+        // un timeout cuenta como falla del proveedor, igual que un 500
+        assertThat(circuitBreaker.getMetrics().getNumberOfFailedCalls()).isEqualTo(1);
     }
 
     @Test

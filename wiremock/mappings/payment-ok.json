@@ -13,7 +13,7 @@
     "headers": { "Content-Type": "application/json" },
     "jsonBody": {
       "approved": true,
-      "transactionId": "txn-{{randomValue type='UUID'}}",
+      "transactionId": "txn-demo-ok",
       "reason": null
     }
   }

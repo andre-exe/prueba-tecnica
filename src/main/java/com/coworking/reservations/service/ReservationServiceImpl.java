@@ -5,6 +5,7 @@ import com.coworking.reservations.domain.entity.Space;
 import com.coworking.reservations.domain.entity.User;
 import com.coworking.reservations.domain.enums.ReservationStatus;
 import com.coworking.reservations.domain.event.ReservationCancelledEvent;
+import com.coworking.reservations.domain.event.ReservationCompletedEvent;
 import com.coworking.reservations.domain.event.ReservationSnapshot;
 import com.coworking.reservations.dto.request.CreateReservationRequest;
 import com.coworking.reservations.dto.request.ReservationFilter;
@@ -115,6 +116,7 @@ public class ReservationServiceImpl implements ReservationService {
         Reservation reservation = reservationRepository.findWithDetailsById(id)
                 .orElseThrow(() -> notFound(id));
         reservation.complete(OffsetDateTime.now(clock));
+        eventPublisher.publishEvent(new ReservationCompletedEvent(reservation.getId()));
         return reservationMapper.toResponse(reservationRepository.saveAndFlush(reservation));
     }
 
@@ -123,7 +125,10 @@ public class ReservationServiceImpl implements ReservationService {
     public int completeExpired() {
         OffsetDateTime now = OffsetDateTime.now(clock);
         List<Reservation> expired = reservationRepository.findAll(ReservationSpecifications.confirmedAndEndedBefore(now));
-        expired.forEach(reservation -> reservation.complete(now));
+        expired.forEach(reservation -> {
+            reservation.complete(now);
+            eventPublisher.publishEvent(new ReservationCompletedEvent(reservation.getId()));
+        });
         return expired.size();
     }
 

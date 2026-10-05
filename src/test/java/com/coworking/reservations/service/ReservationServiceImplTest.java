@@ -8,6 +8,7 @@ import com.coworking.reservations.domain.enums.ReservationStatus;
 import com.coworking.reservations.domain.enums.Role;
 import com.coworking.reservations.domain.enums.SpaceType;
 import com.coworking.reservations.domain.event.ReservationCancelledEvent;
+import com.coworking.reservations.domain.event.ReservationCompletedEvent;
 import com.coworking.reservations.dto.request.CreateReservationRequest;
 import com.coworking.reservations.dto.response.ReservationResponse;
 import com.coworking.reservations.exception.InvalidReservationRequestException;
@@ -43,6 +44,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -282,6 +284,7 @@ class ReservationServiceImplTest {
         when(reservationRepository.saveAndFlush(reservation)).thenReturn(reservation);
 
         assertThat(service.complete(id).status()).isEqualTo(ReservationStatus.COMPLETED);
+        verify(eventPublisher).publishEvent(any(ReservationCompletedEvent.class));
     }
 
     @Test
@@ -305,5 +308,6 @@ class ReservationServiceImplTest {
         assertThat(completed).isEqualTo(2);
         assertThat(first.getStatus()).isEqualTo(ReservationStatus.COMPLETED);
         assertThat(second.getStatus()).isEqualTo(ReservationStatus.COMPLETED);
+        verify(eventPublisher, times(2)).publishEvent(any(ReservationCompletedEvent.class));
     }
 }
