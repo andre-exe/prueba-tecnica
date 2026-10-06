@@ -4,6 +4,8 @@ API REST para gestionar reservas de espacios de coworking (salas de reuniones, p
 
 Está pensada como una base lista para producción, no como un prototipo: migraciones versionadas, errores estandarizados, configuración por perfiles, observabilidad con Actuator, documentación OpenAPI y pruebas contra una base PostgreSQL real.
 
+**Para probar la API:** en [`requests/coworking.http`](requests/coworking.http) están todos los endpoints listos para ejecutar (ver [3.3](#33-ejemplos-de-uso)), y Swagger UI queda disponible al levantar el proyecto.
+
 ---
 
 ## Contenido
@@ -89,6 +91,8 @@ No hace falta crear ningún archivo `.env`: cada variable tiene un valor por def
 | Health | http://localhost:8080/actuator/health |
 | WireMock, stubs cargados | http://localhost:8089/__admin/mappings |
 | WireMock, peticiones recibidas | http://localhost:8089/__admin/requests |
+
+Para probar los endpoints sin escribir las peticiones a mano, abre [`requests/coworking.http`](requests/coworking.http) en VS Code (extensión REST Client) o usa Swagger UI. Más detalles en [3.3](#33-ejemplos-de-uso).
 
 **Credenciales de demo.** Al arrancar se crea de forma idempotente un administrador:
 
